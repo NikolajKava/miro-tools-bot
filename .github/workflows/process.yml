@@ -40,30 +40,11 @@ jobs:
           pip install --quiet yt-dlp
           npm install -g --silent @anthropic-ai/claude-code
 
-      - name: Подключить Miro MCP
-        if: steps.poll.outputs.has_jobs == '1'
-        env:
-          MIRO_TOKEN: ${{ secrets.MIRO_TOKEN }}
-        run: |
-          python - <<'PY'
-          import json, os
-          cfg = {"mcpServers": {"miro": {
-              "type": "http",
-              "url": "https://mcp.miro.com",
-              "headers": {"Authorization": f"Bearer {os.environ['MIRO_TOKEN']}"},
-          }}}
-          with open("mcp.json", "w") as fh:
-              json.dump(cfg, fh)
-          PY
-
       - name: Разобрать видео и записать на доску
         if: steps.poll.outputs.has_jobs == '1'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MIRO_TOKEN: ${{ secrets.MIRO_TOKEN }}
           MIRO_BOARD_URL: ${{ vars.MIRO_BOARD_URL }}
         run: python scripts/process.py
-
-      - name: Убрать за собой
-        if: always()
-        run: rm -f mcp.json
