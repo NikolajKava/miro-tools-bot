@@ -26,17 +26,26 @@ import urllib.request
 
 API = "https://api.miro.com/v2"
 
-# Цвет карточки = категория, чтобы доска читалась с одного взгляда.
-COLORS = {
-    "Маркетинг": "#F24726",
-    "Тексты": "#FAC710",
-    "Дизайн": "#8FD14F",
-    "Видео": "#2D9BF0",
-    "Контекст и токены": "#9510AC",
-    "CLI": "#6881FF",
-    "MCP": "#FF9D48",
-}
 DEFAULT_COLOR = "#D5D5D5"
+
+
+def load_profile():
+    """Доменная часть — категории и их цвета — живёт в profile.json рядом с репозиторием.
+
+    Так один и тот же движок обслуживает разные каталоги: у инструментов для
+    Claude Code свои категории, у дизайнерских — свои, а код остаётся общим.
+    Путь можно переопределить переменной PROFILE.
+    """
+    path = os.environ.get("PROFILE", "profile.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        raise SystemExit(f"нет файла профиля {path} — в нём задаются категории и цвета")
+
+
+# Цвет карточки = категория, чтобы доска читалась с одного взгляда.
+COLORS = load_profile()["categories"]
 
 # Сетка: 4 ячейки в ряд, в ячейке скриншот сверху и карточка под ним.
 CARD_WIDTH = 320
