@@ -1,0 +1,27 @@
+name: Проверка скачивания по ссылке
+
+# Отвечает на один вопрос: отдаёт ли Instagram/TikTok видео с IP раннера GitHub.
+# Если да — можно кидать боту ссылку и не выкачивать ролик руками.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Ссылка на видео"
+        required: true
+        default: "https://www.instagram.com/reel/DagHQBPh5FG/"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet yt-dlp
+      - name: Попробовать скачать
+        run: |
+          echo "IP раннера:"; curl -s https://api.ipify.org; echo
+          yt-dlp -o "probe.%(ext)s" --write-info-json "${{ inputs.url }}" 2>&1 | tail -25
+          echo "--- что получилось:"
+          ls -la probe.* 2>/dev/null || echo "файлов нет"
