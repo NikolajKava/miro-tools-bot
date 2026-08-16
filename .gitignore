@@ -1,0 +1,6 @@
+work/
+mcp.json
+*.mp4
+*.jpg
+*.info.json
+__pycache__/

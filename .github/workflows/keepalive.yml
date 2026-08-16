@@ -1,0 +1,24 @@
+name: Keepalive
+
+# GitHub отключает cron-расписания в репозитории, где 60 дней не было активности.
+# Этот воркфлоу раз в неделю двигает файл-метку, чтобы бот не «уснул» молча.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git config user.name "keepalive"
+          git config user.email "keepalive@users.noreply.github.com"
+          git add .keepalive
+          git diff --staged --quiet || git commit -m "keepalive"
+          git push
