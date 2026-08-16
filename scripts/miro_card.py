@@ -18,6 +18,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -37,10 +38,12 @@ COLORS = {
 }
 DEFAULT_COLOR = "#D5D5D5"
 
-# Сетка: 4 карточки в ряд, левый край — от центра доски со сдвигом влево.
+# Сетка: 4 ячейки в ряд, в ячейке скриншот сверху и карточка под ним.
 CARD_WIDTH = 320
+SHOT_WIDTH = 240
+GAP = 24               # между картинкой и карточкой
 ORIGIN_X, ORIGIN_Y = -570, 0
-STEP_X, STEP_Y = 380, 420
+STEP_X, STEP_Y = 380, 620
 PER_ROW = 4
 
 
@@ -93,6 +96,24 @@ def build_description(category, purpose, install, link, docs, source):
     return "".join(parts)
 
 
+def upload_image(path, title, x, y):
+    """Загружает кадр из видео как image-объект. Multipart, без urllib — через curl."""
+    data = json.dumps({"title": title, "position": {"x": x, "y": y}, "geometry": {"width": SHOT_WIDTH}})
+    result = subprocess.run(
+        [
+            "curl", "-s", "-X", "POST", f"{API}/boards/{board_id()}/images",
+            "-H", f"Authorization: Bearer {os.environ['MIRO_TOKEN']}",
+            "-F", f"resource=@{path}",
+            "-F", f"data={data};type=application/json",
+        ],
+        capture_output=True, text=True, check=True,
+    )
+    created = json.loads(result.stdout)
+    if "id" not in created:
+        raise SystemExit(f"загрузка картинки не удалась: {result.stdout[:400]}")
+    return created
+
+
 def add(args):
     existing = list_cards()
     if any(c["title"].strip().lower() == args.title.strip().lower() for c in existing):
@@ -100,6 +121,16 @@ def add(args):
         return
 
     index = len(existing)
+    x = ORIGIN_X + (index % PER_ROW) * STEP_X
+    cell_top = ORIGIN_Y + (index // PER_ROW) * STEP_Y
+    card_y = cell_top
+
+    # Скриншот занимает верх ячейки, карточка встаёт под него.
+    # Высота картинки зависит от пропорций кадра, поэтому читаем её из ответа.
+    if args.screenshot:
+        shot = upload_image(args.screenshot, args.title, x, cell_top)
+        card_y = cell_top + shot["geometry"]["height"] / 2 + GAP + 45
+
     payload = {
         "data": {
             "title": args.title,
@@ -108,10 +139,7 @@ def add(args):
             ),
         },
         "style": {"cardTheme": COLORS.get(args.category, DEFAULT_COLOR)},
-        "position": {
-            "x": ORIGIN_X + (index % PER_ROW) * STEP_X,
-            "y": ORIGIN_Y + (index // PER_ROW) * STEP_Y,
-        },
+        "position": {"x": x, "y": card_y},
         "geometry": {"width": CARD_WIDTH},
     }
     created = request("POST", f"/boards/{board_id()}/cards", payload)
@@ -138,6 +166,7 @@ def main():
     p.add_argument("--link", default="")
     p.add_argument("--docs", default="")
     p.add_argument("--source", default="")
+    p.add_argument("--screenshot", default="", help="кадр из видео, который ляжет над карточкой")
 
     args = parser.parse_args()
     if args.cmd == "list":
