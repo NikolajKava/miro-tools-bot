@@ -62,7 +62,16 @@ def run_claude(job):
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=JOB_TIMEOUT)
     if proc.returncode != 0:
-        return f"Claude завершился с ошибкой ({proc.returncode}):\n{proc.stderr[-1500:]}"
+        # Причину claude пишет в stdout — там JSON с полем result даже при ошибке.
+        # stderr при этом обычно пуст, поэтому одного его мало.
+        detail = ""
+        try:
+            parsed = json.loads(proc.stdout)
+            detail = parsed.get("result") or parsed.get("error") or json.dumps(parsed, ensure_ascii=False)
+        except json.JSONDecodeError:
+            detail = proc.stdout
+        detail = (detail or proc.stderr or "сообщения нет").strip()[-1200:]
+        return f"Claude завершился с ошибкой ({proc.returncode}):\n{detail}"
     try:
         return json.loads(proc.stdout).get("result", proc.stdout)
     except json.JSONDecodeError:
@@ -88,6 +97,9 @@ def main():
             report = f"Обработка не уложилась в {JOB_TIMEOUT // 60} минут и была прервана."
         except Exception as exc:
             report = f"Сломалось на обработке: {exc}"
+        # Дублируем в лог прогона: иначе разбираться в поломке можно только
+        # по скриншоту переписки, а в Actions не остаётся ничего.
+        print(f"--- отчёт для чата {chat}:\n{report}\n", flush=True)
         send(chat, f"{report}\n\nДоска: {BOARD}")
 
 
